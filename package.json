@@ -1,0 +1,41 @@
+{
+  "name": "flare",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev -w api",
+    "dev:web": "npm run dev -w web",
+    "dev": "npm run dev:api & npm run dev:web",
+    "build": "npm run build -w @flare/node && npm run build -w @flare/react && npm run build -w api && npm run build -w web",
+    "lint": "eslint .",
+    "db:generate": "npm run db:generate -w api",
+    "db:migrate": "npm run db:migrate -w api",
+    "db:seed": "npm run db:seed -w api"
+  },
+  "allowScripts": {
+    "prisma@7.9.1": true,
+    "@prisma/engines@7.9.1": true,
+    "esbuild@0.28.2": true,
+    "fsevents@2.3.3": true
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.8.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/ws": "^8.18.1",
+    "eslint": "^10.4.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.6.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.4"
+  }
+}
