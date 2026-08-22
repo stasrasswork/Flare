@@ -1,0 +1,151 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum FlagType {
+  BOOLEAN
+  PERCENTAGE
+  STRING
+}
+
+enum RuleType {
+  ALL
+  PERCENTAGE
+  USER_ALLOW
+  USER_DENY
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members      Membership[]
+  environments Environment[]
+  flags        Flag[]
+  auditEvents  AuditEvent[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships Membership[]
+  auditEvents AuditEvent[]
+}
+
+model Membership {
+  id          String         @id @default(cuid())
+  userId      String
+  workspaceId String
+  role        MembershipRole
+  createdAt   DateTime       @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+  @@index([workspaceId])
+}
+
+model Environment {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  key          String
+  name         String
+  sdkServerKey String   @unique
+  sdkClientKey String   @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workspace  Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  flagStates FlagState[]
+
+  @@unique([workspaceId, key])
+}
+
+model Flag {
+  id          String    @id @default(cuid())
+  workspaceId String
+  key         String
+  name        String
+  description String?
+  type        FlagType
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  states    FlagState[]
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId])
+}
+
+model FlagState {
+  id            String   @id @default(cuid())
+  flagId        String
+  environmentId String
+  enabled       Boolean  @default(false)
+  defaultValue  Json
+  version       Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  flag        Flag        @relation(fields: [flagId], references: [id], onDelete: Cascade)
+  environment Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  rules       Rule[]
+
+  @@unique([flagId, environmentId])
+}
+
+model Rule {
+  id          String   @id @default(cuid())
+  flagStateId String
+  type        RuleType
+  order       Int
+  percentage  Int?
+  userIds     String[] @default([])
+  value       Json?
+  createdAt   DateTime @default(now())
+
+  flagState FlagState @relation(fields: [flagStateId], references: [id], onDelete: Cascade)
+
+  @@index([flagStateId, order])
+}
+
+model AuditEvent {
+  id          String   @id @default(cuid())
+  workspaceId String
+  actorId     String?
+  action      String
+  entityType  String
+  entityId    String
+  before      Json?
+  after       Json?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actor     User?     @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@index([entityType, entityId])
+}
