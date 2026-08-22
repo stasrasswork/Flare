@@ -33,3 +33,7 @@ export function notFound(message = "Not found"): AppError {
 export function validationError(): AppError {
   return new AppError(400, "Invalid request body", "VALIDATION_ERROR");
 }
+
+export function flagKeyTaken(): AppError {
+  return new AppError(409, "Flag key already exists", "FLAG_KEY_TAKEN");
+}

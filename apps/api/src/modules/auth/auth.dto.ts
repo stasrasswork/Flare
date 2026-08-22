@@ -1,4 +1,4 @@
-import type { WorkspaceSummaryDto } from "../workspaces/workspaces.dto.ts";
+import type { WorkspaceSummaryDto } from "../workspaces/workspaces.dto.js";
 
 export type UserDto = {
   id: string;

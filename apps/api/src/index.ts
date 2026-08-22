@@ -3,11 +3,15 @@ import { app } from "./app.js";
 import { config } from "./config.js";
 import { prisma } from "./lib/prisma.js";
 import { redis, redisSubscriber } from "./lib/redis.js";
+import { rebuildAllSnapshots } from "./modules/flags/flags.snapshot.js";
 
 const server = createServer(app);
 
 server.listen(config.PORT, () => {
   console.log(`API listening on http://localhost:${config.PORT}`);
+  void rebuildAllSnapshots().catch((err: unknown) => {
+    console.error("Failed to rebuild flag snapshots:", err);
+  });
 });
 
 let shuttingDown = false;
