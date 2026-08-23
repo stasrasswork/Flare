@@ -19,4 +19,3 @@ function createRedis() {
 }
 
 export const redis = createRedis();
-export const redisSubscriber = createRedis();

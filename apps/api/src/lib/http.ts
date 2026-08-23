@@ -6,7 +6,9 @@ import { AppError, notFound, validationError } from "./errors.js";
 export function parseBody<T extends z.ZodType>(schema: T, data: unknown): z.infer<T> {
   const result = schema.safeParse(data);
   if (!result.success) {
-    throw validationError();
+    throw validationError(
+      config.NODE_ENV === "production" ? undefined : result.error.flatten(),
+    );
   }
   return result.data;
 }
@@ -20,7 +22,11 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, next) => {
 
   if (err instanceof AppError) {
     res.status(err.statusCode).json({
-      error: { message: err.message, code: err.code },
+      error: {
+        message: err.message,
+        code: err.code,
+        ...(err.details === undefined ? {} : { details: err.details }),
+      },
     });
     return;
   }

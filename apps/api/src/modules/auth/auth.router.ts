@@ -1,5 +1,6 @@
 import type { Response } from "express";
 import { Router } from "express";
+import { asyncHandler } from "../../lib/async-handler.js";
 import { getAuth } from "../../lib/auth-context.js";
 import { parseBody } from "../../lib/http.js";
 import { clearSessionCookie, issueSession } from "../../lib/session.js";
@@ -15,21 +16,31 @@ async function sendAuthResponse(res: Response, user: UserDto, status: 200 | 201)
   res.status(status).json({ user });
 }
 
-authRouter.post("/auth/register", async (req, res) => {
-  const user = await register(parseBody(registerSchema, req.body));
-  await sendAuthResponse(res, user, 201);
-});
+authRouter.post(
+  "/auth/register",
+  asyncHandler(async (req, res) => {
+    const user = await register(parseBody(registerSchema, req.body));
+    await sendAuthResponse(res, user, 201);
+  }),
+);
 
-authRouter.post("/auth/login", async (req, res) => {
-  const user = await login(parseBody(loginSchema, req.body));
-  await sendAuthResponse(res, user, 200);
-});
+authRouter.post(
+  "/auth/login",
+  asyncHandler(async (req, res) => {
+    const user = await login(parseBody(loginSchema, req.body));
+    await sendAuthResponse(res, user, 200);
+  }),
+);
 
 authRouter.post("/auth/logout", (_req, res) => {
   clearSessionCookie(res);
   res.status(204).end();
 });
 
-authRouter.get("/auth/me", requireAuth, async (req, res) => {
-  res.json(await getMe(getAuth(req).userId));
-});
+authRouter.get(
+  "/auth/me",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    res.json(await getMe(getAuth(req).userId));
+  }),
+);

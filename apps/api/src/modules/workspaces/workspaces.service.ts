@@ -3,12 +3,20 @@ import { type DbClient, prisma } from "../../lib/prisma.js";
 import { isUniqueConstraintError } from "../../lib/prisma-errors.js";
 import { createSdkKeyPair } from "../../lib/sdk-keys.js";
 import { uniqueSlug } from "../../lib/slug.js";
+import { indexSdkKeys } from "../../lib/sdk-index.js";
 import { toWorkspaceDto } from "./workspaces.dto.js";
 
 const DEFAULT_ENVIRONMENTS = [
   { key: "dev", name: "Development" },
   { key: "prod", name: "Production" },
 ] as const;
+
+async function finishWorkspace(
+  workspace: Parameters<typeof toWorkspaceDto>[0],
+) {
+  await Promise.all(workspace.environments.map((environment) => indexSdkKeys(environment)));
+  return toWorkspaceDto(workspace, "OWNER");
+}
 
 export async function createWorkspace(
   params: { ownerId: string; name: string },
@@ -33,12 +41,10 @@ export async function createWorkspace(
     });
 
   try {
-    const workspace = await create(uniqueSlug(params.name, { fallback: "workspace" }));
-    return toWorkspaceDto(workspace, "OWNER");
+    return await finishWorkspace(await create(uniqueSlug(params.name, { fallback: "workspace" })));
   } catch (err) {
-    if (isUniqueConstraintError(err)) {
-      const workspace = await create(uniqueSlug(params.name, { fallback: "workspace" }));
-      return toWorkspaceDto(workspace, "OWNER");
+    if (isUniqueConstraintError(err, "slug")) {
+      return finishWorkspace(await create(uniqueSlug(params.name, { fallback: "workspace" })));
     }
     throw err;
   }

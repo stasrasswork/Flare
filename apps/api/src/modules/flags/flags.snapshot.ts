@@ -1,36 +1,24 @@
-import type { FlagType } from "../../generated/prisma/client.js";
+import { indexSdkKeys } from "../../lib/sdk-index.js";
 import { prisma } from "../../lib/prisma.js";
 import { redis } from "../../lib/redis.js";
 import { toFlagValue } from "./flags.dto.js";
+import {
+  snapshotChannel,
+  snapshotKey,
+  snapshotRevisionKey,
+  type FlagSnapshot,
+  type SnapshotFlagType,
+  type SnapshotRule,
+} from "./flags.snapshot-types.js";
 
-export type SnapshotRule = {
-  type: "ALL" | "PERCENTAGE" | "USER_ALLOW" | "USER_DENY";
-  percentage?: number;
-  userIds?: string[];
-  value?: boolean | number | string;
-};
+export type { FlagSnapshot, SnapshotFlag, SnapshotRule } from "./flags.snapshot-types.js";
+export { snapshotChannel, snapshotKey } from "./flags.snapshot-types.js";
 
-export type SnapshotFlag = {
-  type: FlagType;
-  enabled: boolean;
-  defaultValue: boolean | number | string;
-  rules: SnapshotRule[];
-};
-
-export type FlagSnapshot = {
-  version: number;
-  flags: Record<string, SnapshotFlag>;
-};
-
-export function snapshotKey(envId: string): string {
-  return `flags:${envId}:snapshot`;
+function fallbackValue(type: SnapshotFlagType): boolean | string {
+  return type === "STRING" ? "" : false;
 }
 
-export function snapshotChannel(envId: string): string {
-  return `flags:${envId}`;
-}
-
-export async function buildSnapshot(envId: string): Promise<FlagSnapshot> {
+export async function buildSnapshotFlags(envId: string): Promise<FlagSnapshot["flags"]> {
   const states = await prisma.flagState.findMany({
     where: {
       environmentId: envId,
@@ -43,14 +31,12 @@ export async function buildSnapshot(envId: string): Promise<FlagSnapshot> {
   });
 
   const flags: FlagSnapshot["flags"] = {};
-  let version = 0;
 
   for (const state of states) {
-    version = Math.max(version, state.version);
     flags[state.flag.key] = {
       type: state.flag.type,
       enabled: state.enabled,
-      defaultValue: toFlagValue(state.defaultValue) ?? false,
+      defaultValue: toFlagValue(state.defaultValue) ?? fallbackValue(state.flag.type),
       rules: state.rules.map((rule) => {
         const mapped: SnapshotRule = { type: rule.type };
         if (rule.percentage !== null) {
@@ -68,13 +54,17 @@ export async function buildSnapshot(envId: string): Promise<FlagSnapshot> {
     };
   }
 
-  return { version, flags };
+  return flags;
 }
 
 export async function publishSnapshot(envId: string): Promise<FlagSnapshot> {
-  const snapshot = await buildSnapshot(envId);
+  const flags = await buildSnapshotFlags(envId);
+  const version = await redis.incr(snapshotRevisionKey(envId));
+  const snapshot: FlagSnapshot = { version, flags };
+
   await redis.set(snapshotKey(envId), JSON.stringify(snapshot));
-  await redis.publish(snapshotChannel(envId), JSON.stringify({ version: snapshot.version }));
+  await redis.publish(snapshotChannel(envId), JSON.stringify({ version }));
+
   return snapshot;
 }
 
@@ -83,12 +73,20 @@ export async function publishSnapshots(envIds: string[]): Promise<void> {
 }
 
 export async function rebuildAllSnapshots(): Promise<void> {
-  const environments = await prisma.environment.findMany({ select: { id: true } });
+  const environments = await prisma.environment.findMany({
+    select: { id: true, sdkServerKey: true, sdkClientKey: true },
+  });
+
   const results = await Promise.allSettled(
-    environments.map((environment) => publishSnapshot(environment.id)),
+    environments.map(async (environment) => {
+      await indexSdkKeys(environment);
+      await publishSnapshot(environment.id);
+    }),
   );
+
   const failed = results.filter((result) => result.status === "rejected");
   if (failed.length > 0) {
     console.error(`Failed to rebuild ${failed.length} flag snapshot(s)`);
+    throw new Error(`Failed to rebuild ${failed.length} flag snapshot(s)`);
   }
 }

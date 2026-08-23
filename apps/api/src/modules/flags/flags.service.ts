@@ -1,6 +1,6 @@
 import { Prisma, type FlagType } from "../../generated/prisma/client.js";
 import { flagKeyTaken, notFound } from "../../lib/errors.js";
-import { prisma } from "../../lib/prisma.js";
+import { type DbClient, prisma } from "../../lib/prisma.js";
 import { isUniqueConstraintError } from "../../lib/prisma-errors.js";
 import { toFlagDto, toFlagValue } from "./flags.dto.js";
 import type { CreateFlagInput, RuleInput, UpdateFlagInput, UpdateFlagStateInput } from "./flags.schema.js";
@@ -30,6 +30,44 @@ function initialState(type: FlagType): {
     case "STRING":
       return { enabled: false, defaultValue: "", rules: [] };
   }
+}
+
+function toRuleData(rule: RuleInput, order: number) {
+  return {
+    type: rule.type,
+    order,
+    percentage: rule.percentage ?? null,
+    userIds: rule.userIds ?? [],
+    value: rule.value ?? undefined,
+  };
+}
+
+async function writeAudit(
+  db: DbClient,
+  data: {
+    workspaceId: string;
+    actorId: string;
+    action: string;
+    entityType: string;
+    entityId: string;
+    before?: Prisma.InputJsonValue;
+    after?: Prisma.InputJsonValue;
+  },
+) {
+  await db.auditEvent.create({ data });
+}
+
+async function replaceRules(db: DbClient, flagStateId: string, rules: RuleInput[]) {
+  await db.rule.deleteMany({ where: { flagStateId } });
+  if (rules.length === 0) {
+    return;
+  }
+  await db.rule.createMany({
+    data: rules.map((rule, order) => ({
+      flagStateId,
+      ...toRuleData(rule, order),
+    })),
+  });
 }
 
 async function getWorkspaceEnvIds(workspaceId: string): Promise<string[]> {
@@ -98,13 +136,7 @@ export async function createFlag(params: {
               defaultValue: defaults.defaultValue,
               version: 1,
               rules: {
-                create: defaults.rules.map((rule, order) => ({
-                  type: rule.type,
-                  order,
-                  percentage: rule.percentage ?? null,
-                  userIds: rule.userIds ?? [],
-                  value: rule.value ?? undefined,
-                })),
+                create: defaults.rules.map((rule, order) => toRuleData(rule, order)),
               },
             })),
           },
@@ -112,15 +144,13 @@ export async function createFlag(params: {
         include: flagInclude,
       });
 
-      await tx.auditEvent.create({
-        data: {
-          workspaceId: params.workspaceId,
-          actorId: params.actorId,
-          action: "FLAG_CREATE",
-          entityType: "Flag",
-          entityId: created.id,
-          after: toFlagDto(created) as unknown as Prisma.InputJsonValue,
-        },
+      await writeAudit(tx, {
+        workspaceId: params.workspaceId,
+        actorId: params.actorId,
+        action: "FLAG_CREATE",
+        entityType: "Flag",
+        entityId: created.id,
+        after: toFlagDto(created) as unknown as Prisma.InputJsonValue,
       });
 
       return created;
@@ -154,16 +184,14 @@ export async function updateFlag(params: {
       include: flagInclude,
     });
 
-    await tx.auditEvent.create({
-      data: {
-        workspaceId: params.workspaceId,
-        actorId: params.actorId,
-        action: "FLAG_UPDATE",
-        entityType: "Flag",
-        entityId: updated.id,
-        before: toFlagDto(before) as unknown as Prisma.InputJsonValue,
-        after: toFlagDto(updated) as unknown as Prisma.InputJsonValue,
-      },
+    await writeAudit(tx, {
+      workspaceId: params.workspaceId,
+      actorId: params.actorId,
+      action: "FLAG_UPDATE",
+      entityType: "Flag",
+      entityId: updated.id,
+      before: toFlagDto(before) as unknown as Prisma.InputJsonValue,
+      after: toFlagDto(updated) as unknown as Prisma.InputJsonValue,
     });
 
     return updated;
@@ -186,16 +214,14 @@ export async function archiveFlag(params: {
       include: flagInclude,
     });
 
-    await tx.auditEvent.create({
-      data: {
-        workspaceId: params.workspaceId,
-        actorId: params.actorId,
-        action: "FLAG_ARCHIVE",
-        entityType: "Flag",
-        entityId: archived.id,
-        before: toFlagDto(before) as unknown as Prisma.InputJsonValue,
-        after: toFlagDto(archived) as unknown as Prisma.InputJsonValue,
-      },
+    await writeAudit(tx, {
+      workspaceId: params.workspaceId,
+      actorId: params.actorId,
+      action: "FLAG_ARCHIVE",
+      entityType: "Flag",
+      entityId: archived.id,
+      before: toFlagDto(before) as unknown as Prisma.InputJsonValue,
+      after: toFlagDto(archived) as unknown as Prisma.InputJsonValue,
     });
 
     return archived;
@@ -237,19 +263,7 @@ export async function updateFlagState(params: {
     });
 
     if (params.input.rules) {
-      await tx.rule.deleteMany({ where: { flagStateId: state.id } });
-      if (params.input.rules.length > 0) {
-        await tx.rule.createMany({
-          data: params.input.rules.map((rule, order) => ({
-            flagStateId: state.id,
-            type: rule.type,
-            order,
-            percentage: rule.percentage ?? null,
-            userIds: rule.userIds ?? [],
-            value: rule.value ?? undefined,
-          })),
-        });
-      }
+      await replaceRules(tx, state.id, params.input.rules);
     }
 
     const after = await tx.flagState.findUniqueOrThrow({
@@ -257,26 +271,24 @@ export async function updateFlagState(params: {
       include: { rules: { orderBy: { order: "asc" } } },
     });
 
-    await tx.auditEvent.create({
-      data: {
-        workspaceId: params.workspaceId,
-        actorId: params.actorId,
-        action: "FLAG_STATE_UPDATE",
-        entityType: "FlagState",
-        entityId: state.id,
-        before: {
-          enabled: before.enabled,
-          defaultValue: before.defaultValue,
-          version: before.version,
-          rules: before.rules,
-        } as Prisma.InputJsonValue,
-        after: {
-          enabled: after.enabled,
-          defaultValue: after.defaultValue,
-          version: after.version,
-          rules: after.rules,
-        } as Prisma.InputJsonValue,
-      },
+    await writeAudit(tx, {
+      workspaceId: params.workspaceId,
+      actorId: params.actorId,
+      action: "FLAG_STATE_UPDATE",
+      entityType: "FlagState",
+      entityId: state.id,
+      before: {
+        enabled: before.enabled,
+        defaultValue: before.defaultValue,
+        version: before.version,
+        rules: before.rules,
+      } as Prisma.InputJsonValue,
+      after: {
+        enabled: after.enabled,
+        defaultValue: after.defaultValue,
+        version: after.version,
+        rules: after.rules,
+      } as Prisma.InputJsonValue,
     });
   });
 

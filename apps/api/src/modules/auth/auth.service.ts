@@ -9,6 +9,7 @@ import type { LoginInput, RegisterInput } from "./auth.schemas.js";
 
 export async function register(input: RegisterInput) {
   const email = input.email.toLowerCase();
+  const passwordHash = await hashPassword(input.password);
 
   try {
     const user = await prisma.$transaction(async (tx) => {
@@ -16,7 +17,7 @@ export async function register(input: RegisterInput) {
         data: {
           email,
           name: input.name,
-          passwordHash: hashPassword(input.password),
+          passwordHash,
         },
       });
 
@@ -45,7 +46,7 @@ export async function login(input: LoginInput) {
     where: { email: input.email.toLowerCase() },
   });
 
-  if (!user || !verifyPassword(input.password, user.passwordHash)) {
+  if (!user || !(await verifyPassword(input.password, user.passwordHash))) {
     throw invalidCredentials();
   }
 

@@ -1,5 +1,7 @@
 import { prisma } from "../src/lib/prisma.js";
 import { hashPassword } from "../src/lib/password.js";
+import { indexSdkKeys } from "../src/lib/sdk-index.js";
+import { publishSnapshot } from "../src/modules/flags/flags.snapshot.js";
 
 const ADMIN_EMAIL = "admin@flare.local";
 const ADMIN_PASSWORD = "flare-dev";
@@ -91,7 +93,7 @@ async function main() {
     create: {
       email: ADMIN_EMAIL,
       name: "Admin",
-      passwordHash: hashPassword(ADMIN_PASSWORD),
+      passwordHash: await hashPassword(ADMIN_PASSWORD),
     },
   });
 
@@ -172,6 +174,16 @@ async function main() {
         },
       ],
     });
+  }
+
+  try {
+    for (const environment of [dev, prod]) {
+      await indexSdkKeys(environment);
+      await publishSnapshot(environment.id);
+    }
+  } catch (err) {
+    console.warn("Seed did not write Redis snapshots. Start the API to rebuild them.");
+    console.warn(err);
   }
 
   console.log("Seed complete");

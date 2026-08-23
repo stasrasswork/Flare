@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { asyncHandler } from "../../lib/async-handler.js";
 import { getWorkspaceAuth } from "../../lib/auth-context.js";
 import { requireAuth, requireWorkspace } from "../auth/auth.middleware.js";
 import { getWorkspaceForUser } from "./workspaces.service.js";
@@ -9,9 +10,9 @@ workspacesRouter.get(
   "/workspaces/me",
   requireAuth,
   requireWorkspace,
-  async (req, res) => {
+  asyncHandler(async (req, res) => {
     const { userId, workspaceId } = getWorkspaceAuth(req);
     const workspace = await getWorkspaceForUser(userId, workspaceId);
     res.json({ workspace });
-  },
+  }),
 );

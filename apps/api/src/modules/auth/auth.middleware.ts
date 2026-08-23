@@ -1,6 +1,7 @@
+import type { MembershipRole } from "../../generated/prisma/client.js";
 import { asyncHandler } from "../../lib/async-handler.js";
-import { getAuth } from "../../lib/auth-context.js";
-import { noWorkspace } from "../../lib/errors.js";
+import { getAuth, getWorkspaceAuth } from "../../lib/auth-context.js";
+import { forbidden, noWorkspace } from "../../lib/errors.js";
 import { getSessionUserId } from "../../lib/session.js";
 import { findMembership } from "../workspaces/workspaces.service.js";
 
@@ -25,3 +26,13 @@ export const requireWorkspace = asyncHandler(async (req, _res, next) => {
   };
   next();
 });
+
+export function requireRole(...roles: MembershipRole[]) {
+  return asyncHandler((req, _res, next) => {
+    const { role } = getWorkspaceAuth(req);
+    if (!roles.includes(role)) {
+      throw forbidden();
+    }
+    next();
+  });
+}
