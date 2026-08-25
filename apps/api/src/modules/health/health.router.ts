@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "../../lib/async-handler.js";
 import { prisma } from "../../lib/prisma.js";
-import { redis } from "../../lib/redis.js";
+import { redis, redisSub } from "../../lib/redis.js";
 
 export const healthRouter = Router();
 
@@ -22,7 +22,8 @@ healthRouter.get(
         .catch(() => false),
     ]);
 
-    const ok = postgres && redisOk;
-    res.status(ok ? 200 : 503).json({ ok, postgres, redis: redisOk });
+    const redisSubOk = redisSub.status === "ready";
+    const ok = postgres && redisOk && redisSubOk;
+    res.status(ok ? 200 : 503).json({ ok, postgres, redis: redisOk, redisSub: redisSubOk });
   }),
 );

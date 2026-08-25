@@ -63,6 +63,19 @@ export async function findMembership(userId: string, workspaceId?: string) {
   });
 }
 
+export async function requireEnvironmentInWorkspace(workspaceId: string, envId: string) {
+  const environment = await prisma.environment.findFirst({
+    where: { id: envId, workspaceId },
+    select: { id: true },
+  });
+
+  if (!environment) {
+    throw notFound("Environment not found");
+  }
+
+  return environment;
+}
+
 export async function getWorkspaceForUser(userId: string, workspaceId?: string) {
   const membership = await findMembership(userId, workspaceId);
   if (!membership) {
