@@ -3,11 +3,12 @@ import type { IncomingMessage, Server } from "node:http";
 import type { Duplex } from "node:stream";
 import { WebSocket, WebSocketServer } from "ws";
 import { config } from "../../config.js";
-import { redis, redisSub, waitUntilReady } from "../../lib/redis.js";
-import { sdkIndexKey } from "../../lib/sdk-index.js";
+import { redisSub, waitUntilReady } from "../../lib/redis.js";
+import { resolveEnvironmentId } from "../../lib/sdk-index.js";
 import {
   envIdFromChannel,
   FLAG_CHANNEL_PATTERN,
+  type FlagSnapshot,
 } from "../flags/flags.snapshot-types.js";
 import { getSnapshot } from "../flags/flags.snapshot-read.js";
 import { addClient, broadcast, clearClients, hasClients, removeClient } from "./connections.js";
@@ -24,7 +25,7 @@ import {
   type ClientMessage,
   type ServerMessage,
 } from "./gateway.protocol.js";
-import { presenceAdd, presenceHeartbeat, presenceRemove } from "./presence.js";
+import { presenceAdd, presenceRemove } from "./presence.js";
 
 export type Gateway = {
   close: () => Promise<void>;
@@ -102,6 +103,21 @@ async function fanout(channel: string): Promise<void> {
   broadcast(envId, JSON.stringify(snapshotMessage(snapshot)));
 }
 
+async function loadSnapshot(
+  session: Session,
+  envId: string,
+): Promise<FlagSnapshot | null> {
+  const snapshot = await getSnapshot(envId);
+  if (session.closed) {
+    return null;
+  }
+  if (!snapshot) {
+    sendAndClose(session.ws, WsClose.NOT_FOUND, errorMessage("NOT_FOUND", "Snapshot not found"));
+    return null;
+  }
+  return snapshot;
+}
+
 export async function attachGateway(server: Server): Promise<Gateway> {
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD_BYTES });
   const sessions = new Set<Session>();
@@ -170,6 +186,9 @@ export async function attachGateway(server: Server): Promise<Gateway> {
         return;
       }
       session.ws.ping();
+      if (session.pongTimer) {
+        clearTimeout(session.pongTimer);
+      }
       session.pongTimer = setTimeout(() => {
         session.ws.terminate();
       }, PONG_TIMEOUT_MS);
@@ -177,7 +196,7 @@ export async function attachGateway(server: Server): Promise<Gateway> {
   }
 
   async function onHello(session: Session, message: Extract<ClientMessage, { type: "hello" }>): Promise<void> {
-    const envId = await redis.get(sdkIndexKey(message.sdkKey));
+    const envId = await resolveEnvironmentId(message.sdkKey);
     if (session.closed) {
       return;
     }
@@ -186,12 +205,8 @@ export async function attachGateway(server: Server): Promise<Gateway> {
       return;
     }
 
-    const snapshot = await getSnapshot(envId);
-    if (session.closed) {
-      return;
-    }
+    const snapshot = await loadSnapshot(session, envId);
     if (!snapshot) {
-      sendAndClose(session.ws, WsClose.NOT_FOUND, errorMessage("NOT_FOUND", "Snapshot not found"));
       return;
     }
 
@@ -216,12 +231,8 @@ export async function attachGateway(server: Server): Promise<Gateway> {
       return;
     }
 
-    const snapshot = await getSnapshot(session.envId);
-    if (session.closed) {
-      return;
-    }
+    const snapshot = await loadSnapshot(session, session.envId);
     if (!snapshot) {
-      sendAndClose(session.ws, WsClose.NOT_FOUND, errorMessage("NOT_FOUND", "Snapshot not found"));
       return;
     }
 
@@ -251,7 +262,7 @@ export async function attachGateway(server: Server): Promise<Gateway> {
         session.pongTimer = undefined;
       }
       if (session.envId) {
-        void presenceHeartbeat(session.envId, session.connId).catch((err: unknown) => {
+        void presenceAdd(session.envId, session.connId).catch((err: unknown) => {
           console.error("Failed to refresh SDK presence:", err);
         });
       }

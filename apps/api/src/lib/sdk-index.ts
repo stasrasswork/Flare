@@ -14,3 +14,7 @@ export async function indexSdkKeys(environment: {
     redis.set(sdkIndexKey(environment.sdkClientKey), environment.id),
   ]);
 }
+
+export async function resolveEnvironmentId(sdkKey: string): Promise<string | null> {
+  return redis.get(sdkIndexKey(sdkKey));
+}
