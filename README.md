@@ -46,3 +46,5 @@ Web: `http://localhost:5173`
 | `npm run db:generate` | Generate Prisma client |
 | `npm run db:migrate` | Run Prisma migrations |
 | `npm run db:seed` | Seed demo workspace, admin, flags |
+| `npm run test` | API and `@flare/node` tests |
+| `npm run demo:sdk` | Node SDK consumer against local API |

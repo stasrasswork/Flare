@@ -16,6 +16,7 @@ export default defineConfig([
       "apps/api/**/*.{js,mjs,cjs,ts,mts,cts}",
       "apps/web/*.{js,ts}",
       "packages/sdk-node/**/*.ts",
+      "examples/**/*.ts",
     ],
     languageOptions: { globals: globals.node },
   },

@@ -18,7 +18,8 @@
     "db:generate": "npm run db:generate -w api",
     "db:migrate": "npm run db:migrate -w api",
     "db:seed": "npm run db:seed -w api",
-    "test": "npm run test -w api"
+    "test": "npm run test -w api && npm run test -w @flare/node",
+    "demo:sdk": "npm run build -w @flare/node && tsx examples/node-consumer.ts"
   },
   "allowScripts": {
     "prisma@7.9.1": true,
