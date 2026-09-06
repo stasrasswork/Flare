@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export type SnapshotRuleType = "ALL" | "PERCENTAGE" | "USER_ALLOW" | "USER_DENY";
 export type SnapshotFlagType = "BOOLEAN" | "PERCENTAGE" | "STRING";
 
@@ -19,6 +21,37 @@ export type FlagSnapshot = {
   version: number;
   flags: Record<string, SnapshotFlag>;
 };
+
+const snapshotRuleSchema = z.object({
+  type: z.enum(["ALL", "PERCENTAGE", "USER_ALLOW", "USER_DENY"]),
+  percentage: z.number().int().min(0).max(100).optional(),
+  userIds: z.array(z.string().min(1)).max(1000).optional(),
+  value: z.union([z.boolean(), z.number(), z.string()]).optional(),
+});
+
+const snapshotFlagSchema = z.object({
+  type: z.enum(["BOOLEAN", "PERCENTAGE", "STRING"]),
+  enabled: z.boolean(),
+  defaultValue: z.union([z.boolean(), z.number(), z.string()]),
+  rules: z.array(snapshotRuleSchema).max(50),
+});
+
+const flagSnapshotSchema = z.object({
+  version: z.number().int().nonnegative(),
+  flags: z.record(z.string(), snapshotFlagSchema),
+}).superRefine((snapshot, ctx) => {
+  for (const [flagKey, flag] of Object.entries(snapshot.flags)) {
+    const valueSchema = flag.type === "STRING" ? z.string() : z.boolean();
+    if (!valueSchema.safeParse(flag.defaultValue).success) {
+      ctx.addIssue({ code: "custom", path: ["flags", flagKey, "defaultValue"], message: "Invalid value type" });
+    }
+    flag.rules.forEach((rule, ruleIndex) => {
+      if (rule.value !== undefined && !valueSchema.safeParse(rule.value).success) {
+        ctx.addIssue({ code: "custom", path: ["flags", flagKey, "rules", ruleIndex, "value"], message: "Invalid value type" });
+      }
+    });
+  }
+});
 
 export function snapshotKey(envId: string): string {
   return `flags:${envId}:snapshot`;
@@ -55,12 +88,12 @@ export function parseSnapshot(raw: string): FlagSnapshot | null {
       return null;
     }
 
-    const snapshot = parsed as FlagSnapshot;
-    if (typeof snapshot.version !== "number" || typeof snapshot.flags !== "object" || snapshot.flags === null) {
+    const result = flagSnapshotSchema.safeParse(parsed);
+    if (!result.success) {
       return null;
     }
 
-    return snapshot;
+    return result.data as FlagSnapshot;
   } catch {
     return null;
   }

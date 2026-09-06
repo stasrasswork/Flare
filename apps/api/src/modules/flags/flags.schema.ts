@@ -67,6 +67,20 @@ export const updateFlagStateSchema = z
       value.rules !== undefined,
   );
 
+const flagValueSchemas = {
+  BOOLEAN: z.boolean(),
+  PERCENTAGE: z.boolean(),
+  STRING: z.string(),
+} as const;
+
+export function flagStateSchemaForType(type: keyof typeof flagValueSchemas) {
+  const valueSchema = flagValueSchemas[type];
+  return updateFlagStateSchema.extend({
+    defaultValue: valueSchema.optional(),
+    rules: z.array(ruleSchema.extend({ value: valueSchema.optional() })).max(50).optional(),
+  });
+}
+
 export type CreateFlagInput = z.infer<typeof createFlagSchema>;
 export type UpdateFlagInput = z.infer<typeof updateFlagSchema>;
 export type UpdateFlagStateInput = z.infer<typeof updateFlagStateSchema>;

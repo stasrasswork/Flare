@@ -2,6 +2,7 @@ import { emailTaken, invalidCredentials, unauthorized } from "../../lib/errors.j
 import { hashPassword, verifyPassword } from "../../lib/password.js";
 import { prisma } from "../../lib/prisma.js";
 import { isUniqueConstraintError } from "../../lib/prisma-errors.js";
+import { indexSdkKeys } from "../../lib/sdk-index.js";
 import { toWorkspaceSummaryDto } from "../workspaces/workspaces.dto.js";
 import { createWorkspace } from "../workspaces/workspaces.service.js";
 import { toUserDto, type MeDto } from "./auth.dto.js";
@@ -12,7 +13,7 @@ export async function register(input: RegisterInput) {
   const passwordHash = await hashPassword(input.password);
 
   try {
-    const user = await prisma.$transaction(async (tx) => {
+    const { user, workspace } = await prisma.$transaction(async (tx) => {
       const created = await tx.user.create({
         data: {
           email,
@@ -21,7 +22,7 @@ export async function register(input: RegisterInput) {
         },
       });
 
-      await createWorkspace(
+      const workspace = await createWorkspace(
         {
           ownerId: created.id,
           name: input.workspaceName?.trim() || `${input.name}'s workspace`,
@@ -29,8 +30,10 @@ export async function register(input: RegisterInput) {
         tx,
       );
 
-      return created;
+      return { user: created, workspace };
     });
+
+    await Promise.all(workspace.environments.map((environment) => indexSdkKeys(environment)));
 
     return toUserDto(user);
   } catch (err) {

@@ -1,9 +1,15 @@
 import { Prisma, type FlagType } from "../../generated/prisma/client.js";
-import { flagKeyTaken, notFound } from "../../lib/errors.js";
+import { flagKeyTaken, notFound, validationError } from "../../lib/errors.js";
 import { type DbClient, prisma } from "../../lib/prisma.js";
 import { isUniqueConstraintError } from "../../lib/prisma-errors.js";
 import { toFlagDto, toFlagValue } from "./flags.dto.js";
-import type { CreateFlagInput, RuleInput, UpdateFlagInput, UpdateFlagStateInput } from "./flags.schema.js";
+import {
+  flagStateSchemaForType,
+  type CreateFlagInput,
+  type RuleInput,
+  type UpdateFlagInput,
+  type UpdateFlagStateInput,
+} from "./flags.schema.js";
 import { publishSnapshot, publishSnapshots } from "./flags.snapshot.js";
 
 const flagInclude = {
@@ -240,6 +246,11 @@ export async function updateFlagState(params: {
 }) {
   const flag = await findFlagOrThrow(params.workspaceId, params.flagId);
 
+  const validatedInput = flagStateSchemaForType(flag.type).safeParse(params.input);
+  if (!validatedInput.success) {
+    throw validationError(validatedInput.error.flatten());
+  }
+
   const environment = await prisma.environment.findFirst({
     where: { id: params.environmentId, workspaceId: params.workspaceId },
   });
@@ -256,14 +267,14 @@ export async function updateFlagState(params: {
     const state = await tx.flagState.update({
       where: { id: before.id },
       data: {
-        enabled: params.input.enabled ?? before.enabled,
-        defaultValue: params.input.defaultValue ?? toFlagValue(before.defaultValue) ?? false,
+        enabled: validatedInput.data.enabled ?? before.enabled,
+        defaultValue: validatedInput.data.defaultValue ?? toFlagValue(before.defaultValue) ?? false,
         version: { increment: 1 },
       },
     });
 
-    if (params.input.rules) {
-      await replaceRules(tx, state.id, params.input.rules);
+    if (validatedInput.data.rules) {
+      await replaceRules(tx, state.id, validatedInput.data.rules);
     }
 
     const after = await tx.flagState.findUniqueOrThrow({

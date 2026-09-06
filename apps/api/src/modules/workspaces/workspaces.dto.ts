@@ -4,7 +4,6 @@ export type EnvironmentDto = {
   id: string;
   key: string;
   name: string;
-  sdkServerKey: string;
   sdkClientKey: string;
 };
 
@@ -24,7 +23,6 @@ export function toEnvironmentDto(environment: EnvironmentDto): EnvironmentDto {
     id: environment.id,
     key: environment.key,
     name: environment.name,
-    sdkServerKey: environment.sdkServerKey,
     sdkClientKey: environment.sdkClientKey,
   };
 }

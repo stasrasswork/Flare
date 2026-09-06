@@ -7,6 +7,7 @@ import { rebuildAllSnapshots } from "./modules/flags/flags.snapshot.js";
 import { attachGateway, type Gateway } from "./modules/gateway/gateway.js";
 
 const server = createServer(app);
+const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 let shuttingDown = false;
 let gateway: Gateway | undefined;
@@ -18,16 +19,21 @@ async function shutdown(signal: string) {
   shuttingDown = true;
   console.log(`${signal} received, shutting down`);
 
-  if (gateway) {
-    await gateway.close();
+  try {
+    await gateway?.close();
+    await Promise.race([
+      new Promise<void>((resolve) => server.close(() => resolve())),
+      new Promise<void>((resolve) => {
+        setTimeout(() => {
+          server.closeAllConnections();
+          resolve();
+        }, SHUTDOWN_TIMEOUT_MS).unref();
+      }),
+    ]);
+  } finally {
+    await Promise.allSettled([prisma.$disconnect(), redis.quit(), redisSub.quit()]);
+    process.exit(0);
   }
-
-  await new Promise<void>((resolve) => {
-    server.close(() => resolve());
-  });
-
-  await Promise.allSettled([prisma.$disconnect(), redis.quit(), redisSub.quit()]);
-  process.exit(0);
 }
 
 process.on("SIGINT", () => {

@@ -56,6 +56,9 @@ export function parseServerMessage(raw: string): ServerMessage | null {
     if (typeof message.flags !== "object" || message.flags === null || Array.isArray(message.flags)) {
       return null;
     }
+      if (!validFlags(message.flags)) {
+        return null;
+      }
     return {
       type: "snapshot",
       version: message.version,
@@ -74,4 +77,45 @@ export function parseServerMessage(raw: string): ServerMessage | null {
   }
 
   return null;
+}
+
+function validFlags(flags: object): flags is FlagSnapshot["flags"] {
+  return Object.values(flags).every((flag) => {
+    if (typeof flag !== "object" || flag === null || Array.isArray(flag)) {
+      return false;
+    }
+    const candidate = flag as Record<string, unknown>;
+    if (
+      (candidate.type !== "BOOLEAN" && candidate.type !== "PERCENTAGE" && candidate.type !== "STRING") ||
+      typeof candidate.enabled !== "boolean" ||
+      !Array.isArray(candidate.rules)
+    ) {
+      return false;
+    }
+    const valueIsValid = candidate.type === "STRING"
+      ? typeof candidate.defaultValue === "string"
+      : typeof candidate.defaultValue === "boolean";
+    return valueIsValid && candidate.rules.every(validRule(candidate.type));
+  });
+}
+
+function validRule(type: "BOOLEAN" | "PERCENTAGE" | "STRING") {
+  return (rule: unknown): boolean => {
+    if (typeof rule !== "object" || rule === null || Array.isArray(rule)) {
+      return false;
+    }
+    const candidate = rule as Record<string, unknown>;
+    if (
+      candidate.type !== "ALL" &&
+      candidate.type !== "PERCENTAGE" &&
+      candidate.type !== "USER_ALLOW" &&
+      candidate.type !== "USER_DENY"
+    ) {
+      return false;
+    }
+    if (candidate.value === undefined) {
+      return true;
+    }
+    return type === "STRING" ? typeof candidate.value === "string" : typeof candidate.value === "boolean";
+  };
 }
