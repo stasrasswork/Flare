@@ -75,9 +75,9 @@ const flagValueSchemas = {
 
 export function flagStateSchemaForType(type: keyof typeof flagValueSchemas) {
   const valueSchema = flagValueSchemas[type];
-  return updateFlagStateSchema.extend({
+  return updateFlagStateSchema.safeExtend({
     defaultValue: valueSchema.optional(),
-    rules: z.array(ruleSchema.extend({ value: valueSchema.optional() })).max(50).optional(),
+    rules: z.array(ruleSchema.safeExtend({ value: valueSchema.optional() })).max(50).optional(),
   });
 }
 
