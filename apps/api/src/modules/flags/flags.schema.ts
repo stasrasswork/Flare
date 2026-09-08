@@ -73,11 +73,37 @@ const flagValueSchemas = {
   STRING: z.string(),
 } as const;
 
+const auditRuleSchema = z.object({
+  type: ruleTypeSchema,
+  order: z.number().int().nonnegative(),
+  percentage: z.number().int().min(0).max(100).nullable(),
+  userIds: z.array(z.string().min(1)).max(1000),
+  value: flagValueSchema.nullable(),
+});
+
+export const flagStateAuditSnapshotSchema = z.object({
+  flagId: z.string().min(1),
+  environmentId: z.string().min(1),
+  stateId: z.string().min(1),
+  enabled: z.boolean(),
+  defaultValue: flagValueSchema,
+  version: z.number().int().nonnegative(),
+  rules: z.array(auditRuleSchema).max(50),
+});
+
 export function flagStateSchemaForType(type: keyof typeof flagValueSchemas) {
   const valueSchema = flagValueSchemas[type];
   return updateFlagStateSchema.safeExtend({
     defaultValue: valueSchema.optional(),
     rules: z.array(ruleSchema.safeExtend({ value: valueSchema.optional() })).max(50).optional(),
+  });
+}
+
+export function auditSnapshotSchemaForType(type: keyof typeof flagValueSchemas) {
+  const valueSchema = flagValueSchemas[type];
+  return flagStateAuditSnapshotSchema.safeExtend({
+    defaultValue: valueSchema,
+    rules: z.array(auditRuleSchema.safeExtend({ value: valueSchema.nullable() })).max(50),
   });
 }
 

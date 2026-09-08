@@ -148,4 +148,5 @@ model AuditEvent {
 
   @@index([workspaceId, createdAt])
   @@index([entityType, entityId])
+  @@index([workspaceId, entityType, entityId, createdAt])
 }

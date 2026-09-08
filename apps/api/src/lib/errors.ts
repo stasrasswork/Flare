@@ -44,6 +44,10 @@ export function flagKeyTaken(): AppError {
   return new AppError(409, "Flag key already exists", "FLAG_KEY_TAKEN");
 }
 
+export function conflict(message: string): AppError {
+  return new AppError(409, message, "CONFLICT");
+}
+
 export function invalidSdkKey(): AppError {
   return new AppError(401, "Invalid SDK key", "INVALID_SDK_KEY");
 }

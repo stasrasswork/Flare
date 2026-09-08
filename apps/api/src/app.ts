@@ -3,6 +3,7 @@ import express from "express";
 import { config } from "./config.js";
 import { errorHandler, notFoundHandler } from "./lib/http.js";
 import { authRouter } from "./modules/auth/auth.router.js";
+import { auditRouter } from "./modules/audit/audit.router.js";
 import { evaluateRouter } from "./modules/evaluate/evaluate.router.js";
 import { flagsRouter } from "./modules/flags/flags.router.js";
 import { gatewayRouter } from "./modules/gateway/gateway.router.js";
@@ -18,6 +19,7 @@ app.use(express.json());
 
 app.use(healthRouter);
 app.use(authRouter);
+app.use(auditRouter);
 app.use(workspacesRouter);
 app.use(flagsRouter);
 app.use(gatewayRouter);

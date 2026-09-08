@@ -11,6 +11,7 @@ import {
   type UpdateFlagStateInput,
 } from "./flags.schema.js";
 import { publishSnapshot, publishSnapshots } from "./flags.snapshot.js";
+import { toFlagStateAuditSnapshot } from "./flags.audit.js";
 
 const flagInclude = {
   states: {
@@ -282,24 +283,23 @@ export async function updateFlagState(params: {
       include: { rules: { orderBy: { order: "asc" } } },
     });
 
+    const beforeSnapshot = toFlagStateAuditSnapshot({
+      flagId: flag.id,
+      state: before,
+    });
+    const afterSnapshot = toFlagStateAuditSnapshot({
+      flagId: flag.id,
+      state: { ...after, environmentId: params.environmentId },
+    });
+
     await writeAudit(tx, {
       workspaceId: params.workspaceId,
       actorId: params.actorId,
       action: "FLAG_STATE_UPDATE",
       entityType: "FlagState",
       entityId: state.id,
-      before: {
-        enabled: before.enabled,
-        defaultValue: before.defaultValue,
-        version: before.version,
-        rules: before.rules,
-      } as Prisma.InputJsonValue,
-      after: {
-        enabled: after.enabled,
-        defaultValue: after.defaultValue,
-        version: after.version,
-        rules: after.rules,
-      } as Prisma.InputJsonValue,
+      before: beforeSnapshot as Prisma.InputJsonValue,
+      after: afterSnapshot as Prisma.InputJsonValue,
     });
   });
 
