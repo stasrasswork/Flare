@@ -83,3 +83,14 @@ export type UpdateFlagInput = {
   name?: string;
   description?: string | null;
 };
+
+export type AuditEvent = {
+  id: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  actor: { id: string; name: string; email: string } | null;
+  before: unknown;
+  after: unknown;
+  createdAt: string;
+};

@@ -3,6 +3,7 @@ import { FlagRow } from "./FlagRow";
 
 type FlagListProps = {
   flags: Flag[];
+  workspaceId: string;
   environmentId: string;
   canEdit: boolean;
   loading: boolean;
@@ -12,7 +13,7 @@ type FlagListProps = {
   onArchive: (flagId: string) => Promise<void>;
 };
 
-export function FlagList({ flags, environmentId, canEdit, loading, error, onUpdate, onMetadataUpdate, onArchive }: FlagListProps) {
+export function FlagList({ flags, workspaceId, environmentId, canEdit, loading, error, onUpdate, onMetadataUpdate, onArchive }: FlagListProps) {
   if (loading) {
     return <div className="empty-state">Loading flags...</div>;
   }
@@ -25,7 +26,7 @@ export function FlagList({ flags, environmentId, canEdit, loading, error, onUpda
 
   return (
     <div className="flag-list">
-      {flags.filter((flag) => !flag.archivedAt).map((flag) => <FlagRow canEdit={canEdit} environmentId={environmentId} flag={flag} key={`${flag.id}:${environmentId}`} onArchive={onArchive} onMetadataUpdate={onMetadataUpdate} onUpdate={onUpdate} />)}
+      {flags.filter((flag) => !flag.archivedAt).map((flag) => <FlagRow canEdit={canEdit} environmentId={environmentId} flag={flag} key={`${flag.id}:${environmentId}`} onArchive={onArchive} onMetadataUpdate={onMetadataUpdate} onUpdate={onUpdate} workspaceId={workspaceId} />)}
     </div>
   );
 }

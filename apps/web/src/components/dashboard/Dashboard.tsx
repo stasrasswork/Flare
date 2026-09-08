@@ -35,7 +35,7 @@ export function Dashboard({ user, workspace, environment, flags, flagsLoading, f
         <section className="page-heading"><div><p className="eyebrow">Workspace / {workspace.slug}</p><h1>Feature control</h1><p className="muted">Manage release behavior across your connected applications.</p></div><EnvironmentSelector environments={workspace.environments} onChange={onEnvironmentChange} selectedId={environment.id} /></section>
         <StatsBar connectionCount={connectionCount} enabledCount={enabledCount} flagCount={environmentFlags.filter((flag) => !flag.archivedAt).length} />
         <section className="section-heading"><div><p className="eyebrow">Live configuration</p><h2>{environment.name}</h2></div><div className="section-actions">{canEdit ? <CreateFlagForm onCreate={onFlagCreate} /> : null}<span className="live-indicator"><i /> Polling live status</span></div></section>
-        <FlagList canEdit={canEdit} environmentId={environment.id} error={flagsError} flags={environmentFlags} loading={flagsLoading} onArchive={onFlagArchive} onMetadataUpdate={onFlagMetadataUpdate} onUpdate={onFlagUpdate} />
+        <FlagList canEdit={canEdit} environmentId={environment.id} error={flagsError} flags={environmentFlags} loading={flagsLoading} onArchive={onFlagArchive} onMetadataUpdate={onFlagMetadataUpdate} onUpdate={onFlagUpdate} workspaceId={workspace.id} />
       </div>
     </main>
   );

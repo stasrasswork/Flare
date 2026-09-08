@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { getPercentage, getStateForEnvironment, parsePercentage, percentageRules } from "../../lib/flag-state";
 import type { Flag, FlagState, UpdateFlagInput, UpdateFlagStateInput } from "../../types/flare";
+import { FlagAuditPanel } from "../audit/FlagAuditPanel";
+import { TargetingEditor } from "./TargetingEditor";
 
 type FlagRowProps = {
   flag: Flag;
+  workspaceId: string;
   environmentId: string;
   canEdit: boolean;
   onUpdate: (flagId: string, input: UpdateFlagStateInput) => Promise<void>;
@@ -15,7 +18,7 @@ function StateBadge({ state }: { state: FlagState | undefined }) {
   return <span className={`status-badge ${state?.enabled ? "is-on" : "is-off"}`}>{state?.enabled ? "Enabled" : "Off"}</span>;
 }
 
-export function FlagRow({ flag, environmentId, canEdit, onUpdate, onMetadataUpdate, onArchive }: FlagRowProps) {
+export function FlagRow({ flag, workspaceId, environmentId, canEdit, onUpdate, onMetadataUpdate, onArchive }: FlagRowProps) {
   const state = getStateForEnvironment(flag, environmentId);
   const [percentage, setPercentage] = useState(String(getPercentage(state)));
   const [saving, setSaving] = useState(false);
@@ -83,6 +86,8 @@ export function FlagRow({ flag, environmentId, canEdit, onUpdate, onMetadataUpda
         {flag.type === "STRING" ? <div className="string-control"><input aria-label={`${flag.name} value`} disabled={!canEdit || saving} onChange={(event) => setStringValue(event.target.value)} value={stringValue} /><button className="small-button" disabled={!canEdit || saving} onClick={() => void update({ defaultValue: stringValue })} type="button">Save</button></div> : null}
       </div>
       {canEdit ? <div className="row-actions"><button className="text-button" disabled={saving} onClick={() => (editing ? void saveMetadata() : setEditing(true))} type="button">{editing ? "Save details" : "Edit details"}</button><button className="danger-button" disabled={saving} onClick={() => { if (window.confirm(`Archive ${flag.name}?`)) void onArchive(flag.id); }} type="button">Archive</button></div> : null}
+      <FlagAuditPanel canEdit={canEdit} environmentId={environmentId} flagId={flag.id} workspaceId={workspaceId} />
+      <TargetingEditor canEdit={canEdit} onSave={(rules) => update({ rules })} state={state} />
       {error ? <p className="row-error" role="alert">{error}</p> : null}
     </article>
   );

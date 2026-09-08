@@ -1,6 +1,7 @@
 import { request } from "./client";
 import type {
   Flag,
+  AuditEvent,
   CreateFlagInput,
   Me,
   UpdateFlagInput,
@@ -60,6 +61,21 @@ export const flareApi = {
 
   getConnectionCount(workspaceId: string, environmentId: string) {
     return request<{ count: number }>(`/environments/${environmentId}/connections`, {
+      workspaceId,
+    });
+  },
+
+  listAuditEvents(workspaceId: string, flagId: string, environmentId: string) {
+    const query = new URLSearchParams({ environmentId });
+    return request<{ events: AuditEvent[]; nextCursor: string | null }>(
+      `/flags/${flagId}/audit?${query.toString()}`,
+      { workspaceId },
+    );
+  },
+
+  rollbackFlag(workspaceId: string, flagId: string, eventId: string) {
+    return request<{ flag: Flag }>(`/flags/${flagId}/audit/${eventId}/rollback`, {
+      method: "POST",
       workspaceId,
     });
   },
