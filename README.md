@@ -23,17 +23,32 @@ Product brief: [`docs/PRODUCT.md`](docs/PRODUCT.md)
 
 ```bash
 npm install
-cp apps/api/.env.example apps/api/.env
-cp apps/web/.env.example apps/web/.env
-docker compose up -d
-npm run db:migrate
-npm run db:seed
-npm run dev:api
-npm run dev:web
+docker compose up --build
 ```
 
-API: `http://localhost:3000`  
+API: `http://localhost:3000`
 Web: `http://localhost:5173`
+
+The API container waits for PostgreSQL and Redis, applies migrations, and seeds the demo workspace before listening.
+
+Demo login:
+
+```text
+email: admin@flare.local
+password: flare-dev
+```
+
+For local development without the API/web containers:
+
+```bash
+cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env
+docker compose up -d postgres redis
+npm run db:migrate
+npm run db:seed
+```
+
+Then run `npm run dev:api` and `npm run dev:web` in separate terminals.
 
 ## Scripts (root)
 
@@ -46,5 +61,15 @@ Web: `http://localhost:5173`
 | `npm run db:generate` | Generate Prisma client |
 | `npm run db:migrate` | Run Prisma migrations |
 | `npm run db:seed` | Seed demo workspace, admin, flags |
-| `npm run test` | API and `@flare/node` tests |
+| `npm run test` | API, SDK, and web tests |
 | `npm run demo:sdk` | Node SDK consumer against local API |
+
+## Demo flow
+
+1. Open the web app and sign in with the demo credentials.
+2. Switch between `dev` and `prod` and toggle `buy-one-click`.
+3. Change the `new-feed` rollout percentage and add a targeting rule.
+4. Expand a flag's audit history and roll back a previous state.
+5. In another terminal, run `npm run demo:sdk` and verify that each change prints `update` without a reload.
+
+Stop the stack with `docker compose down`. Add `-v` when you want to remove the local PostgreSQL volume and reset the demo data.

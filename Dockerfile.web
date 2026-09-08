@@ -1,0 +1,20 @@
+FROM node:20-alpine AS build
+WORKDIR /app
+ARG VITE_API_URL=http://localhost:3000
+ENV VITE_API_URL=$VITE_API_URL
+COPY package*.json ./
+COPY apps/web/package.json apps/web/package.json
+RUN npm ci
+COPY . .
+RUN npm run build -w web
+
+FROM node:20-alpine
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=build /app/package*.json ./
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/apps/web/package.json apps/web/package.json
+COPY --from=build /app/apps/web/dist apps/web/dist
+COPY --from=build /app/apps/web/vite.config.ts apps/web/vite.config.ts
+EXPOSE 5173
+CMD ["npm", "run", "preview", "-w", "web", "--", "--host", "0.0.0.0"]
