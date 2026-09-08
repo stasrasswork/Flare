@@ -1,4 +1,5 @@
 import { prisma } from "../src/lib/prisma.js";
+import { redis, redisSub } from "../src/lib/redis.js";
 import { hashPassword } from "../src/lib/password.js";
 import { indexSdkKeys } from "../src/lib/sdk-index.js";
 import { publishSnapshot } from "../src/modules/flags/flags.snapshot.js";
@@ -199,5 +200,5 @@ main()
     process.exitCode = 1;
   })
   .finally(async () => {
-    await prisma.$disconnect();
+    await Promise.allSettled([prisma.$disconnect(), redis.quit(), redisSub.quit()]);
   });

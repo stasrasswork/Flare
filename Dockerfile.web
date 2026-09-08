@@ -15,6 +15,6 @@ COPY --from=build /app/package*.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps/web/package.json apps/web/package.json
 COPY --from=build /app/apps/web/dist apps/web/dist
-COPY --from=build /app/apps/web/vite.config.ts apps/web/vite.config.ts
+COPY --from=build /app/apps/web/serve.mjs apps/web/serve.mjs
 EXPOSE 5173
-CMD ["npm", "run", "preview", "-w", "web", "--", "--host", "0.0.0.0"]
+CMD ["node", "apps/web/serve.mjs"]

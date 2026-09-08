@@ -1,5 +1,7 @@
 FROM node:20-alpine AS build
 WORKDIR /app
+ARG DATABASE_URL=postgresql://postgres:postgres@localhost:5432/flare?schema=public
+ENV DATABASE_URL=$DATABASE_URL
 COPY package*.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY packages/sdk-node/package.json packages/sdk-node/package.json
@@ -15,7 +17,8 @@ COPY --from=build /app/package*.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps/api/package.json apps/api/package.json
 COPY --from=build /app/apps/api/dist apps/api/dist
+COPY --from=build /app/apps/api/src apps/api/src
 COPY --from=build /app/apps/api/prisma apps/api/prisma
 COPY --from=build /app/apps/api/prisma.config.ts apps/api/prisma.config.ts
 EXPOSE 3000
-CMD ["sh", "-c", "npx prisma migrate deploy --schema apps/api/prisma/schema.prisma && npm run db:seed -w api && npm run start -w api"]
+CMD ["sh", "-c", "cd apps/api && npx prisma migrate deploy && npm run db:seed && npm run start"]

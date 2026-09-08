@@ -14,7 +14,7 @@ export default defineConfig([
   {
     files: [
       "apps/api/**/*.{js,mjs,cjs,ts,mts,cts}",
-      "apps/web/*.{js,ts}",
+      "apps/web/*.{js,mjs,ts}",
       "packages/sdk-node/**/*.ts",
       "examples/**/*.ts",
     ],
