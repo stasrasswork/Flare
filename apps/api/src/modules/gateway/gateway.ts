@@ -3,6 +3,7 @@ import type { IncomingMessage, Server } from "node:http";
 import type { Duplex } from "node:stream";
 import { WebSocket, WebSocketServer } from "ws";
 import { config } from "../../config.js";
+import { logger } from "../../lib/logger.js";
 import { redisSub, waitUntilReady } from "../../lib/redis.js";
 import { resolveEnvironmentId } from "../../lib/sdk-index.js";
 import {
@@ -30,6 +31,8 @@ import { presenceAdd, presenceRemove } from "./presence.js";
 export type Gateway = {
   close: () => Promise<void>;
 };
+
+const gatewayLogger = logger.child({ component: "gateway" });
 
 type Session = {
   ws: WebSocket;
@@ -146,7 +149,7 @@ export async function attachGateway(server: Server): Promise<Gateway> {
 
   const onPMessage = (_pattern: string, channel: string) => {
     void fanout(channel).catch((err: unknown) => {
-      console.error("Flag snapshot fan-out failed:", err);
+      gatewayLogger.error({ err, channel }, "Flag snapshot fan-out failed");
     });
   };
 
@@ -175,7 +178,10 @@ export async function attachGateway(server: Server): Promise<Gateway> {
     if (session.envId) {
       removeClient(session.envId, session.connId);
       void presenceRemove(session.envId, session.connId).catch((err: unknown) => {
-        console.error("Failed to clear SDK presence:", err);
+        gatewayLogger.error(
+          { err, envId: session.envId, connId: session.connId },
+          "Failed to clear SDK presence",
+        );
       });
     }
   }
@@ -213,7 +219,10 @@ export async function attachGateway(server: Server): Promise<Gateway> {
     session.envId = envId;
     addClient({ ws: session.ws, connId: session.connId, envId });
     await presenceAdd(envId, session.connId).catch((err: unknown) => {
-      console.error("Failed to record SDK presence:", err);
+      gatewayLogger.error(
+        { err, envId, connId: session.connId },
+        "Failed to record SDK presence",
+      );
     });
     if (session.closed) {
       void presenceRemove(envId, session.connId).catch(() => undefined);
@@ -263,7 +272,10 @@ export async function attachGateway(server: Server): Promise<Gateway> {
       }
       if (session.envId) {
         void presenceAdd(session.envId, session.connId).catch((err: unknown) => {
-          console.error("Failed to refresh SDK presence:", err);
+          gatewayLogger.error(
+            { err, envId: session.envId, connId: session.connId },
+            "Failed to refresh SDK presence",
+          );
         });
       }
     });
@@ -284,14 +296,17 @@ export async function attachGateway(server: Server): Promise<Gateway> {
         session.helloStarted = true;
         clearTimeout(session.helloTimer);
         void onHello(session, message).catch((err: unknown) => {
-          console.error("SDK hello failed:", err);
+          gatewayLogger.error({ err, connId: session.connId }, "SDK hello failed");
           sendAndClose(ws, WsClose.BAD_MESSAGE, errorMessage("BAD_MESSAGE", "Hello failed"));
         });
         return;
       }
 
       void onResync(session, message.version).catch((err: unknown) => {
-        console.error("SDK resync failed:", err);
+        gatewayLogger.error(
+          { err, envId: session.envId, connId: session.connId },
+          "SDK resync failed",
+        );
       });
     });
 

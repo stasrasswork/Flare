@@ -2,6 +2,7 @@ import type { ErrorRequestHandler, RequestHandler } from "express";
 import type { z } from "zod";
 import { config } from "../config.js";
 import { AppError, notFound, validationError } from "./errors.js";
+import { logger } from "./logger.js";
 
 export function parseBody<T extends z.ZodType>(schema: T, data: unknown): z.infer<T> {
   const result = schema.safeParse(data);
@@ -31,7 +32,7 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, next) => {
     return;
   }
 
-  console.error(err);
+  logger.error({ err }, "Unhandled request error");
 
   const isProd = config.NODE_ENV === "production";
   const message = err instanceof Error ? err.message : "Internal server error";

@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import { z } from "zod";
 
+
 dotenv.config({
   path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../.env"),
   quiet: true,
@@ -15,6 +16,9 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(16),
   CORS_ORIGIN: z.string().min(1),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  LOG_LEVEL: z
+    .enum(["fatal", "error", "warn", "info", "debug", "trace"])
+    .default("info"),
 });
 
 const parsed = envSchema.safeParse(process.env);

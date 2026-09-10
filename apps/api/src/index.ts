@@ -5,6 +5,7 @@ import { prisma } from "./lib/prisma.js";
 import { redis, redisSub } from "./lib/redis.js";
 import { rebuildAllSnapshots } from "./modules/flags/flags.snapshot.js";
 import { attachGateway, type Gateway } from "./modules/gateway/gateway.js";
+import { logger } from "./lib/logger.js";
 
 const server = createServer(app);
 const SHUTDOWN_TIMEOUT_MS = 10_000;
@@ -17,7 +18,7 @@ async function shutdown(signal: string) {
     return;
   }
   shuttingDown = true;
-  console.log(`${signal} received, shutting down`);
+  logger.info({ signal }, "Shutdown requested");
 
   try {
     await gateway?.close();
@@ -49,7 +50,7 @@ async function main() {
 
   await new Promise<void>((resolve, reject) => {
     server.listen(config.PORT, () => {
-      console.log(`API listening on http://localhost:${config.PORT}`);
+      logger.info({ port: config.PORT }, "API listening");
       resolve();
     });
     server.once("error", reject);
@@ -57,6 +58,6 @@ async function main() {
 }
 
 void main().catch((err: unknown) => {
-  console.error("Failed to start API:", err);
+  logger.error({ err }, "Failed to start API");
   process.exit(1);
 });

@@ -1,5 +1,7 @@
 import cors from "cors";
 import express from "express";
+import { pinoHttp } from "pino-http";
+import { logger } from "./lib/logger.js";
 import { config } from "./config.js";
 import { errorHandler, notFoundHandler } from "./lib/http.js";
 import { authRouter } from "./modules/auth/auth.router.js";
@@ -14,9 +16,9 @@ import "./types/express.js";
 export const app = express();
 
 app.disable("x-powered-by");
+app.use(pinoHttp({ logger }));
 app.use(cors({ origin: config.CORS_ORIGIN, credentials: true }));
 app.use(express.json());
-
 app.use(healthRouter);
 app.use(authRouter);
 app.use(auditRouter);
