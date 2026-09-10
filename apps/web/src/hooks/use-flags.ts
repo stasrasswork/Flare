@@ -52,7 +52,7 @@ export function useFlags(workspaceId: string | undefined) {
   const archive = useCallback(async (flagId: string) => {
     if (!workspaceId) return;
     const response = await flareApi.archiveFlag(workspaceId, flagId);
-    setFlags((current) => current.map((flag) => (flag.id === response.flag.id ? response.flag : flag)));
+    setFlags((current) => current.filter((flag) => flag.id !== response.flag.id));
   }, [workspaceId]);
 
   return { flags, loading, error, reload, updateState, create, update, archive };

@@ -50,8 +50,28 @@ export function FlagRow({ flag, workspaceId, environmentId, canEdit, onUpdate, o
   }
 
   async function saveMetadata() {
-    await onMetadataUpdate(flag.id, { name, description });
-    setEditing(false);
+    setSaving(true);
+    setError(null);
+    try {
+      await onMetadataUpdate(flag.id, { name, description });
+      setEditing(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to update flag");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function archive() {
+    setSaving(true);
+    setError(null);
+    try {
+      await onArchive(flag.id);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to archive flag");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -85,7 +105,7 @@ export function FlagRow({ flag, workspaceId, environmentId, canEdit, onUpdate, o
         ) : null}
         {flag.type === "STRING" ? <div className="string-control"><input aria-label={`${flag.name} value`} disabled={!canEdit || saving} onChange={(event) => setStringValue(event.target.value)} value={stringValue} /><button className="small-button" disabled={!canEdit || saving} onClick={() => void update({ defaultValue: stringValue })} type="button">Save</button></div> : null}
       </div>
-      {canEdit ? <div className="row-actions"><button className="text-button" disabled={saving} onClick={() => (editing ? void saveMetadata() : setEditing(true))} type="button">{editing ? "Save details" : "Edit details"}</button><button className="danger-button" disabled={saving} onClick={() => { if (window.confirm(`Archive ${flag.name}?`)) void onArchive(flag.id); }} type="button">Archive</button></div> : null}
+      {canEdit ? <div className="row-actions"><button className="text-button" disabled={saving} onClick={() => (editing ? void saveMetadata() : setEditing(true))} type="button">{editing ? "Save details" : "Edit details"}</button><button className="danger-button" disabled={saving} onClick={() => { if (window.confirm(`Archive ${flag.name}?`)) void archive(); }} type="button">Archive</button></div> : null}
       <FlagAuditPanel canEdit={canEdit} environmentId={environmentId} flagId={flag.id} workspaceId={workspaceId} />
       <TargetingEditor canEdit={canEdit} onSave={(rules) => update({ rules })} state={state} />
       {error ? <p className="row-error" role="alert">{error}</p> : null}

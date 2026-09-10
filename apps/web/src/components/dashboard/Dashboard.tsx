@@ -22,7 +22,7 @@ type DashboardProps = {
 };
 
 export function Dashboard({ user, workspace, environment, flags, flagsLoading, flagsError, connectionCount, canEdit, onEnvironmentChange, onFlagUpdate, onFlagMetadataUpdate, onFlagArchive, onFlagCreate, onLogout }: DashboardProps) {
-  const environmentFlags = flags;
+  const environmentFlags = flags.filter((flag) => !flag.archivedAt);
   const enabledCount = environmentFlags.filter((flag) => flag.states.find((state) => state.environmentId === environment.id)?.enabled).length;
 
   return (
@@ -33,7 +33,7 @@ export function Dashboard({ user, workspace, environment, flags, flagsLoading, f
       </header>
       <div className="content-wrap">
         <section className="page-heading"><div><p className="eyebrow">Workspace / {workspace.slug}</p><h1>Feature control</h1><p className="muted">Manage release behavior across your connected applications.</p></div><EnvironmentSelector environments={workspace.environments} onChange={onEnvironmentChange} selectedId={environment.id} /></section>
-        <StatsBar connectionCount={connectionCount} enabledCount={enabledCount} flagCount={environmentFlags.filter((flag) => !flag.archivedAt).length} />
+        <StatsBar connectionCount={connectionCount} enabledCount={enabledCount} flagCount={environmentFlags.length} />
         <section className="section-heading"><div><p className="eyebrow">Live configuration</p><h2>{environment.name}</h2></div><div className="section-actions">{canEdit ? <CreateFlagForm onCreate={onFlagCreate} /> : null}<span className="live-indicator"><i /> Polling live status</span></div></section>
         <FlagList canEdit={canEdit} environmentId={environment.id} error={flagsError} flags={environmentFlags} loading={flagsLoading} onArchive={onFlagArchive} onMetadataUpdate={onFlagMetadataUpdate} onUpdate={onFlagUpdate} workspaceId={workspace.id} />
       </div>

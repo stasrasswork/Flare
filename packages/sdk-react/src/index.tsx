@@ -8,6 +8,9 @@ type Snapshot = { version: number; flags: Record<string, Flag> };
 type Context = { userId?: string };
 type EvalReason = "NOT_FOUND" | "DISABLED" | "USER_DENY" | "USER_ALLOW" | "PERCENTAGE" | "ALL" | "DEFAULT";
 type EvalResult = { value: FlagValue; reason: EvalReason };
+type ServerMessage = SnapshotMessage | ServerError;
+type SnapshotMessage = { type: "snapshot"; version: number; flags: Snapshot["flags"] };
+type ServerError = { type: "error"; code: "UNAUTHORIZED" | "NOT_FOUND" | "BAD_MESSAGE"; message: string };
 
 type ClientOptions = { sdkKey: string; url: string; reconnect?: boolean };
 
@@ -44,6 +47,70 @@ function websocketUrl(url: string): string {
   parsed.protocol = parsed.protocol === "https:" ? "wss:" : "ws:";
   parsed.pathname = `${parsed.pathname.replace(/\/$/, "")}/v1/stream`;
   return parsed.toString();
+}
+
+function parseServerMessage(raw: string): ServerMessage | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const message = parsed as Record<string, unknown>;
+
+  if (message.type === "error") {
+    if (
+      (message.code !== "UNAUTHORIZED" && message.code !== "NOT_FOUND" && message.code !== "BAD_MESSAGE") ||
+      typeof message.message !== "string"
+    ) {
+      return null;
+    }
+    return { type: "error", code: message.code, message: message.message };
+  }
+
+  if (
+    message.type !== "snapshot" ||
+    typeof message.version !== "number" ||
+    !Number.isInteger(message.version) ||
+    message.version < 0 ||
+    typeof message.flags !== "object" ||
+    message.flags === null ||
+    Array.isArray(message.flags) ||
+    !validFlags(message.flags)
+  ) {
+    return null;
+  }
+
+  return {
+    type: "snapshot",
+    version: message.version,
+    flags: message.flags as Snapshot["flags"],
+  };
+}
+
+function validFlags(flags: object): flags is Snapshot["flags"] {
+  return Object.values(flags).every((flag) => {
+    if (typeof flag !== "object" || flag === null || Array.isArray(flag)) return false;
+    const candidate = flag as Record<string, unknown>;
+    const flagType = candidate.type;
+    if (flagType !== "BOOLEAN" && flagType !== "PERCENTAGE" && flagType !== "STRING") return false;
+    const validDefault = flagType === "STRING"
+      ? typeof candidate.defaultValue === "string"
+      : typeof candidate.defaultValue === "boolean";
+    return typeof candidate.enabled === "boolean" && Array.isArray(candidate.rules) && validDefault && candidate.rules.every((rule) => validRule(rule, flagType));
+  });
+}
+
+function validRule(rule: unknown, type: FlagType): boolean {
+  if (typeof rule !== "object" || rule === null || Array.isArray(rule)) return false;
+  const candidate = rule as Record<string, unknown>;
+  if (candidate.type !== "ALL" && candidate.type !== "PERCENTAGE" && candidate.type !== "USER_ALLOW" && candidate.type !== "USER_DENY") return false;
+  if (candidate.percentage !== undefined && (typeof candidate.percentage !== "number" || candidate.percentage < 0 || candidate.percentage > 100)) return false;
+  if (candidate.userIds !== undefined && (!Array.isArray(candidate.userIds) || !candidate.userIds.every((userId) => typeof userId === "string"))) return false;
+  if (candidate.value === undefined) return true;
+  return type === "STRING" ? typeof candidate.value === "string" : typeof candidate.value === "boolean";
 }
 
 class ReactFlareClient {
@@ -90,13 +157,15 @@ class ReactFlareClient {
       socket.send(JSON.stringify({ type: "hello", sdkKey: this.options.sdkKey, sdk: "react", version: this.snapshot?.version ?? 0 }));
     };
     socket.onmessage = (event) => {
-      let message: unknown;
-      try { message = JSON.parse(String(event.data)); } catch { return; }
-      if (!message || typeof message !== "object") return;
-      const candidate = message as { type?: string; version?: number; flags?: Snapshot["flags"] };
-      if (candidate.type !== "snapshot" || typeof candidate.version !== "number" || !candidate.flags) return;
-      if (this.snapshot?.version === candidate.version) return;
-      this.snapshot = { version: candidate.version, flags: candidate.flags };
+      const message = parseServerMessage(String(event.data));
+      if (!message) return;
+      if (message.type === "error") {
+        this.closed = true;
+        socket.close();
+        return;
+      }
+      if (this.snapshot?.version === message.version) return;
+      this.snapshot = { version: message.version, flags: message.flags };
       this.notify();
     };
     socket.onclose = () => {
