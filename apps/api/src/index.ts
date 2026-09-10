@@ -1,11 +1,11 @@
 import { createServer } from "node:http";
 import { app } from "./app.js";
 import { config } from "./config.js";
+import { logger } from "./lib/logger.js";
 import { prisma } from "./lib/prisma.js";
 import { redis, redisSub } from "./lib/redis.js";
 import { rebuildAllSnapshots } from "./modules/flags/flags.snapshot.js";
 import { attachGateway, type Gateway } from "./modules/gateway/gateway.js";
-import { logger } from "./lib/logger.js";
 
 const server = createServer(app);
 const SHUTDOWN_TIMEOUT_MS = 10_000;

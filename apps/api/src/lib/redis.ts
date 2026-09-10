@@ -1,5 +1,6 @@
 import { Redis } from "ioredis";
 import { config } from "../config.js";
+import { logger } from "./logger.js";
 
 function createRedis() {
   const client = new Redis(config.REDIS_URL, {
@@ -12,7 +13,7 @@ function createRedis() {
   });
 
   client.on("error", (err: Error & { code?: string }) => {
-    console.error("Redis error:", err.code ?? err.message);
+    logger.error({ err, code: err.code }, "Redis error");
   });
 
   return client;
@@ -23,7 +24,7 @@ export const redis = createRedis();
 export const redisSub = redis.duplicate();
 
 redisSub.on("error", (err: Error & { code?: string }) => {
-  console.error("Redis subscriber error:", err.code ?? err.message);
+  logger.error({ err, code: err.code }, "Redis subscriber error");
 });
 
 export function waitUntilReady(client: Redis, timeoutMs = 10_000): Promise<void> {

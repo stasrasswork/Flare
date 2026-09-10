@@ -1,4 +1,5 @@
 import { indexSdkKeys } from "../../lib/sdk-index.js";
+import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
 import { redis } from "../../lib/redis.js";
 import { toFlagValue } from "./flags.dto.js";
@@ -86,7 +87,7 @@ export async function rebuildAllSnapshots(): Promise<void> {
 
   const failed = results.filter((result) => result.status === "rejected");
   if (failed.length > 0) {
-    console.error(`Failed to rebuild ${failed.length} flag snapshot(s)`);
+    logger.error({ failed: failed.length }, "Failed to rebuild flag snapshots");
     throw new Error(`Failed to rebuild ${failed.length} flag snapshot(s)`);
   }
 }
